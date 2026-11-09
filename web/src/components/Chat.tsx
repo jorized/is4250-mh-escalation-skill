@@ -143,6 +143,7 @@ export function Chat({ creds, onSignOut }: { creds: Credentials; onSignOut: () =
       setHistory([...nextHistory, { role: "assistant", content: assistantText(turn) }]);
       transcript.current = [...nextLines, { role: "assistant", text: turn.reply }];
     } catch (err) {
+      console.error("Reply failed:", err);
       setHistory(history); // drop the failed user turn so history stays valid
       setItems((xs) => [...xs, { kind: "error", text: errorText(err) }]);
     } finally {
@@ -323,6 +324,10 @@ function errorText(err: unknown): string {
   if (err instanceof RefusalError) return "The AI couldn't answer that turn. " + fallback;
   if (err instanceof Anthropic.AuthenticationError) return "The API key was rejected. Open “Your data” → Forget my API key, and sign in again.";
   if (err instanceof Anthropic.RateLimitError) return "Too many requests right now. Wait a moment and try again. " + fallback;
-  if (err instanceof Anthropic.APIError) return `API error (${err.status ?? "network"}). ` + fallback;
+  if (err instanceof Anthropic.APIError) {
+    // In test mode, show the API's own message so problems can be diagnosed without DevTools.
+    const detail = TEST_MODE ? ` [test mode detail: ${err.message}]` : "";
+    return `API error (${err.status ?? "network"}). ` + fallback + detail;
+  }
   return fallback;
 }
