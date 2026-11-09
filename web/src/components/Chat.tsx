@@ -37,7 +37,11 @@ export function Chat({ creds, onSignOut }: { creds: Credentials; onSignOut: () =
   const [usage, setUsage] = useState(store.loadUsage());
 
   const bottom = useRef<HTMLDivElement>(null);
-  useEffect(() => bottom.current?.scrollIntoView({ behavior: "smooth" }), [items, busy]);
+  // Braces matter: newer browsers return a Promise from scrollIntoView, and
+  // React would treat a returned value as the effect's cleanup function.
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ behavior: "smooth" });
+  }, [items, busy]);
 
   // Record this session start (timestamp only).
   useEffect(() => {
