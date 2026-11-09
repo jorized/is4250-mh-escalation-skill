@@ -1,0 +1,73 @@
+{
+  "institution": "NATIONAL",
+  "source": "Persona transcripts and team analysis. Confirm before shipping.",
+  "entries": [
+    {
+      "id": "sg-sos",
+      "unit": "Samaritans of Singapore (SOS)",
+      "level": 3,
+      "phone": "1767",
+      "email": null,
+      "booking_url": null,
+      "hours": null,
+      "access": "phone",
+      "situations": ["general", "crisis"],
+      "verified": false,
+      "last_verified": null
+    },
+    {
+      "id": "sg-mindline",
+      "unit": "mindline",
+      "level": 3,
+      "phone": "1771",
+      "email": null,
+      "booking_url": null,
+      "hours": null,
+      "access": "phone",
+      "situations": ["general", "crisis"],
+      "verified": false,
+      "last_verified": null
+    },
+    {
+      "id": "sg-995",
+      "unit": "Emergency ambulance (995)",
+      "level": 4,
+      "phone": "995",
+      "email": null,
+      "booking_url": null,
+      "hours": "24 hours",
+      "access": "phone",
+      "situations": ["emergency"],
+      "verified": true,
+      "last_verified": null
+    },
+    {
+      "id": "sg-oogachaga",
+      "unit": "Oogachaga (LGBTQ+-affirming support)",
+      "level": 3,
+      "phone": null,
+      "email": null,
+      "booking_url": null,
+      "hours": null,
+      "access": null,
+      "situations": ["lgbtq"],
+      "verified": false,
+      "last_verified": null,
+      "notes": "Suggested by the team analysis. Contact details not yet added: verify and fill in before relying on this entry."
+    },
+    {
+      "id": "sg-polyclinic-cmht",
+      "unit": "Polyclinics and community mental health teams (subsidised options)",
+      "level": 3,
+      "phone": null,
+      "email": null,
+      "booking_url": null,
+      "hours": null,
+      "access": null,
+      "situations": ["cost"],
+      "verified": false,
+      "last_verified": null,
+      "notes": "Named in Priya's baseline response. Verify and add specific contacts."
+    }
+  ]
+}

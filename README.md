@@ -1,0 +1,77 @@
+# IS4250: Student Support Escalation Skill
+
+An AI **skill** that triages distress in Singapore university students and connects them to the nearest, least intimidating human support. It never diagnoses or treats. Built from the team's *Escalation Skill: Gap Analysis and Must-Have Requirements* (M1–M11).
+
+Two deliverables share one source of truth (`skill/`):
+
+| | What | For |
+|---|---|---|
+| **White-label skill** | `skill/` → `student-support-escalation.zip` | A school admin uploads it to ChatGPT Edu (or a Claude workspace) |
+| **Web MVP** | `web/` (React + Vite) → GitHub Pages | Our own demo chatbot running the same skill, with the parts a skill can't do on its own built in code |
+
+> **TEST MODE is on everywhere.** Escalation to a school is simulated and labelled. Nothing is sent to anyone. Calls and emails the student starts themselves are real.
+
+## Repo layout
+
+```
+skill/
+  SKILL.md                 core rules: tiers, routing, consent, tone
+  references/
+    scripts.md             disclosure, consent prompt, summary template, bridges
+    tier3.md               the "No" at Tier 3 rule (pending clinician sign-off)
+    thresholds.md          mood and dependency thresholds (placeholders)
+    routing/*.json         the ONLY contacts the bot may name
+web/                       React MVP (loads skill/ at build time)
+evals/personas.md          persona scripts, rubric, automatic fails
+scripts/package-skill.sh   builds the white-label zip
+```
+
+## What the web MVP enforces in code
+
+A skill is only instructions. The web app adds hard guarantees:
+
+- **M1** Contacts render only from `routing/*.json`; any id the model invents is dropped.
+- **M2** The opening disclosure is fixed text, not generated.
+- **M3/M4** Real Yes / Not now / Tell me more buttons; an editable summary preview; `tel:` and `mailto:` links with the approved summary pre-filled.
+- **M6** The tier can only go up within a session ("forget it, I'm fine" can't reset it).
+- **M7/M8** Opt-in weekly mood check-in and message-time counters (no content) kept in the browser, visible and deletable under "Your data".
+- **M9** The hotline card is shown once.
+- **M10** The TEST MODE label is rendered by the app on every simulated handoff.
+
+## Run locally
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Sign in with the shared course credentials, then paste an Anthropic API key (use one with a low spend limit). The key stays in your browser and goes only to Anthropic.
+
+## Deploy
+
+Pushing to `main` runs `.github/workflows/deploy.yml`, which builds `web/` and publishes it to GitHub Pages. Repo settings → Pages → Source must be **GitHub Actions**.
+
+### About the login on GitHub Pages
+
+GitHub Pages only serves static files, so it **cannot do real HTTP basic auth** and cannot keep a server-side secret. The sign-in screen is a soft gate that runs in the browser; anyone who reads the JS can bypass it. That's why **no API key is ever built into the site**: each user brings their own. If you need real access control or a shared key, put a small proxy (for example a Cloudflare Worker with basic auth) in front of the API.
+
+## White-label install
+
+```bash
+./scripts/package-skill.sh   # → student-support-escalation.zip
+```
+
+ChatGPT Edu: skills are off by default. The workspace admin turns them on, uploads the zip, and sets who can use it. Before that, replace `{DATA_NOTE}` for that deployment in `skill/references/scripts.md` with what the school's admins can actually see.
+
+## Open items before any real use
+
+Copied from the requirements doc (section 10). None of these are settled by this repo:
+
+- Clinicians confirm the Tier 3 definition and the rule for a "No" at Tier 3.
+- Confirm what ChatGPT Edu admins can see; fix the disclosure wording.
+- Verify every NUS contact (several `"verified": false`), add the UCS booking URL, and build NTU / SMU / SUSS / SUTD / SIT tables (currently empty stubs).
+- Replace placeholder thresholds with clinician-backed numbers.
+- PDPA review with the school's data protection officer.
+- Blind re-score of the persona transcripts; add the proportionality dimension.
+- Check with the instructor about NUS IRB before any user testing.
