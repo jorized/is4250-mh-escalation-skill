@@ -98,7 +98,8 @@ export function Chat({ creds, onSignOut }: { creds: Credentials; onSignOut: () =
       newItems.push({
         kind: "assistant",
         text: turn.reply,
-        routes: routes.filter((r) => r.id !== consentRoute?.id),
+        // The route being offered is the top route: show its card first, not hidden behind "Yes".
+        routes: consentRoute ? [consentRoute, ...routes.filter((r) => r.id !== consentRoute.id)] : routes,
         consent: consentRoute && turn.summary ? { route: consentRoute, turn } : undefined,
       });
       if ((turn.show_hotline || turn.tier >= 2) && !hotlineShown.current) {
