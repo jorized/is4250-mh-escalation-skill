@@ -14,12 +14,12 @@
       "email": "SoC.Cares@nus.edu.sg",
       "booking_url": null,
       "hours": null,
-      "access": "email or phone (phones listed on the SoC Student Life page)",
+      "access": "email",
       "anonymity_notes": "Student-support managers, separate from supervisors and lecturers.",
       "situations": ["general"],
       "verified": false,
       "last_verified": null,
-      "notes": "The email link and one phone link on the page point to a different address and number than displayed. Confirm the right ones."
+      "notes": "Phone numbers for the three named managers are on the SoC Student Life page; add them once verified. The email link and one phone link there point to a different address and number than displayed. Confirm the right ones."
     },
     {
       "id": "nus-ucs",
