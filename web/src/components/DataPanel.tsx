@@ -36,7 +36,7 @@ export function DataPanel(props: {
           Delete all my data
         </button>
         <button className="secondary" onClick={props.onSignOut}>
-          Forget my API key
+          Sign out
         </button>
       </div>
     </div>

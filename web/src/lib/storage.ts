@@ -54,6 +54,12 @@ export function forgetApiKey(): void {
   remove(session, K.apiKey);
   remove(local, K.apiKey);
 }
+// ---- proxy sign-in (this tab only) ----
+const PROXY_AUTH = "s4250.proxyAuth";
+export const loadProxyAuth = (): string => read(session, PROXY_AUTH, "");
+export const saveProxyAuth = (basic: string) => write(session, PROXY_AUTH, basic);
+export const forgetProxyAuth = () => remove(session, PROXY_AUTH);
+
 export const loadModel = (fallback: string) => read(local, K.model, fallback);
 export const saveModel = (m: string) => write(local, K.model, m);
 export const gatePassed = () => read(session, K.gate, false);

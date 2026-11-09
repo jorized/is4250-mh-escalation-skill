@@ -1,0 +1,24 @@
+name = "is4250-proxy"
+main = "src/index.ts"
+compatibility_date = "2026-11-01"
+
+[vars]
+# Only these sites may call the proxy (the Pages site, and local dev).
+ALLOWED_ORIGINS = "https://jorized.github.io,http://localhost:5173"
+APP_USER = "is4250"
+# Only these models can be used through the proxy (keeps cost predictable).
+ALLOWED_MODELS = "claude-haiku-5-5"
+MAX_TOKENS_CAP = "16000"
+
+# Secrets (NOT in this file). Set them with:
+#   npx wrangler secret put ANTHROPIC_API_KEY
+#   npx wrangler secret put APP_PASSWORD
+
+# Per-IP rate limit: 20 requests a minute (one chat message = 2 requests).
+[[ratelimits]]
+name = "LIMITER"
+namespace_id = "4250"
+
+  [ratelimits.simple]
+  limit = 20
+  period = 60

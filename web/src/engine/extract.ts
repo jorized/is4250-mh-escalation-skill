@@ -10,8 +10,28 @@ export interface Line {
 /** The slide-5 window: the engine reads the last ~20 messages. Older risk is kept by the tier floor. */
 export const WINDOW = 20;
 
-export function makeClient(apiKey: string, browser: boolean): Anthropic {
-  return new Anthropic({ apiKey, dangerouslyAllowBrowser: browser });
+/**
+ * Direct (own API key) or via the proxy Worker (password only; the Worker
+ * swaps in the real key server-side, so "proxy" below is a placeholder).
+ */
+export function makeClient(
+  opts: { apiKey: string; browser: boolean } | { proxyUrl: string; basicAuth: string },
+): Anthropic {
+  if ("proxyUrl" in opts) {
+    return new Anthropic({
+      apiKey: "proxy",
+      baseURL: opts.proxyUrl,
+      dangerouslyAllowBrowser: true,
+      defaultHeaders: { Authorization: `Basic ${opts.basicAuth}` },
+    });
+  }
+  return new Anthropic({ apiKey: opts.apiKey, dangerouslyAllowBrowser: opts.browser });
+}
+
+/** Server-side refusal fallback. Haiku 5.5 has none, so it gets no fallback params. */
+export function fallbackParams(model: string) {
+  if (model.startsWith("claude-haiku")) return {};
+  return { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const };
 }
 
 export function formatTranscript(lines: Line[]): string {
@@ -38,8 +58,7 @@ export async function extractCues(opts: {
   const response = await opts.client.beta.messages.parse({
     model: opts.model,
     max_tokens: 16000,
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
+    ...fallbackParams(opts.model),
     system: [
       {
         type: "text",

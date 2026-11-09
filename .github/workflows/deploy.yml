@@ -35,6 +35,8 @@ jobs:
       - run: npm run build
         env:
           VITE_TEST_MODE: "true"
+          # Set with: gh variable set PROXY_URL --body https://...workers.dev
+          VITE_PROXY_URL: ${{ vars.PROXY_URL }}
           VITE_BASE: /${{ github.event.repository.name }}/
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -1,0 +1,13 @@
+{
+  "name": "is4250-proxy",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "check": "wrangler deploy --dry-run --outdir .wrangler/check"
+  },
+  "devDependencies": {
+    "wrangler": "^4.158.0"
+  }
+}

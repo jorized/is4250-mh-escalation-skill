@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { assistantText, RefusalError, runTurn, type ChatMessage, type Turn } from "../lib/llm";
 import { EMERGENCY_IDS, HOTLINE_IDS, resolveRoutes, type RouteEntry } from "../lib/routing";
 import { OPENING_DISCLOSURE, RISK_CUES_PROMPT } from "../lib/skill";
-import { TEST_MODE } from "../lib/config";
+import { PROXY_URL, TEST_MODE } from "../lib/config";
 import { checkinDue, dependencySignals, moodOfferDue } from "../lib/signals";
 import * as store from "../lib/storage";
 import { extractCues, makeClient, type Line } from "../engine/extract.ts";
@@ -23,7 +23,13 @@ type Item =
   | { kind: "error"; text: string };
 
 export function Chat({ creds, onSignOut }: { creds: Credentials; onSignOut: () => void }) {
-  const client = useMemo(() => makeClient(creds.apiKey, true), [creds.apiKey]);
+  const client = useMemo(
+    () =>
+      creds.mode === "proxy"
+        ? makeClient({ proxyUrl: PROXY_URL, basicAuth: creds.basicAuth })
+        : makeClient({ apiKey: creds.apiKey, browser: true }),
+    [creds],
+  );
   const [items, setItems] = useState<Item[]>([]);
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -223,6 +229,7 @@ export function Chat({ creds, onSignOut }: { creds: Credentials; onSignOut: () =
           }}
           onSignOut={() => {
             store.forgetApiKey();
+            store.forgetProxyAuth();
             onSignOut();
           }}
           onClose={() => setPanel("")}
@@ -322,7 +329,7 @@ export function Chat({ creds, onSignOut }: { creds: Credentials; onSignOut: () =
 function errorText(err: unknown): string {
   const fallback = "Something went wrong reaching the AI. If you need help now: call 995, or SOS on 1767.";
   if (err instanceof RefusalError) return "The AI couldn't answer that turn. " + fallback;
-  if (err instanceof Anthropic.AuthenticationError) return "The API key was rejected. Open “Your data” → Forget my API key, and sign in again.";
+  if (err instanceof Anthropic.AuthenticationError) return "Sign-in was rejected. Open “Your data” → Sign out, and sign in again.";
   if (err instanceof Anthropic.RateLimitError) return "Too many requests right now. Wait a moment and try again. " + fallback;
   if (err instanceof Anthropic.APIError) {
     // In test mode, show the API's own message so problems can be diagnosed without DevTools.

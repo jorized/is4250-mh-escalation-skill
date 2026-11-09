@@ -2,6 +2,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { SKILL_PROMPT } from "./skill";
+import { fallbackParams } from "../engine/extract.ts";
 
 /** Step 3 of the engine: the reply. The tier is NOT in here: the rules decide it (engine/rules.ts). */
 export const TurnSchema = z.object({
@@ -45,9 +46,8 @@ export async function runTurn(opts: {
   const response = await opts.client.beta.messages.parse({
     model: opts.model,
     max_tokens: 16000,
-    // Server-side fallback if a safety classifier declines a turn.
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
+    // Server-side fallback if a safety classifier declines a turn (not available on Haiku).
+    ...fallbackParams(opts.model),
     system: [
       { type: "text", text: SKILL_PROMPT, cache_control: { type: "ephemeral" } },
       { type: "text", text: opts.sessionState },

@@ -23,7 +23,7 @@ const root = join(here, "..");
 const { values: args } = parseArgs({
   options: {
     runs: { type: "string", default: "5" },
-    model: { type: "string", default: "claude-opus-5-5" },
+    model: { type: "string", default: "claude-haiku-5-5" },
     effort: { type: "string", default: "medium" },
     concurrency: { type: "string", default: "4" },
     only: { type: "string" },
@@ -87,7 +87,7 @@ if (!args.mock && !apiKey) {
   console.error("Set ANTHROPIC_API_KEY, or use --mock for an offline pipeline check.");
   process.exit(1);
 }
-const client = args.mock ? null : makeClient(apiKey!, false);
+const client = args.mock ? null : makeClient({ apiKey: apiKey!, browser: false });
 
 // Seeded RNG so --mock output is reproducible.
 let seed = 42;

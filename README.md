@@ -25,6 +25,7 @@ skill/
 web/                       React MVP (loads skill/ at build time)
 evals/personas.md          persona scripts, rubric, automatic fails
 poc/                       proof of concept: engine vs labelled vignettes
+proxy/                     Cloudflare Worker: holds the API key, checks the password
 scripts/package-skill.sh   builds the white-label zip
 ```
 
@@ -76,9 +77,11 @@ Sign in with the shared course credentials, then paste an Anthropic API key (use
 
 Pushing to `main` runs `.github/workflows/deploy.yml`, which builds `web/` and publishes it to GitHub Pages. Repo settings → Pages → Source must be **GitHub Actions**.
 
-### About the login on GitHub Pages
+### Sign-in and the API key
 
-GitHub Pages only serves static files, so it **cannot do real HTTP basic auth** and cannot keep a server-side secret. The sign-in screen is a soft gate that runs in the browser; anyone who reads the JS can bypass it. That's why **no API key is ever built into the site**: each user brings their own. If you need real access control or a shared key, put a small proxy (for example a Cloudflare Worker with basic auth) in front of the API.
+GitHub Pages only serves static files, so it can't keep a secret. The key lives in a **Cloudflare Worker** (`proxy/`): visitors sign in with the shared password, the Worker checks it server-side and calls Claude Haiku 5.5 with its own key. **No API key is ever built into the site.** Setup: `proxy/README.md`.
+
+If `PROXY_URL` isn't set, the site falls back to "bring your own API key" with a browser-only password gate (not real security). Team members can still pick that option on the sign-in screen.
 
 ## White-label install
 
