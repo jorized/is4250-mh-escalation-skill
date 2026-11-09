@@ -20,11 +20,35 @@ skill/
     scripts.md             disclosure, consent prompt, summary template, bridges
     tier3.md               the "No" at Tier 3 rule (pending clinician sign-off)
     thresholds.md          mood and dependency thresholds (placeholders)
+    risk-cues.md           C-SSRS / PHQ-9 cues and the rules that set the tier
     routing/*.json         the ONLY contacts the bot may name
 web/                       React MVP (loads skill/ at build time)
 evals/personas.md          persona scripts, rubric, automatic fails
+poc/                       proof of concept: engine vs labelled vignettes
 scripts/package-skill.sh   builds the white-label zip
 ```
+
+## The escalation engine (deck slides 5–7)
+
+```
+student message
+  → 1. LLM extracts C-SSRS / PHQ-9 cues from the last ~20 messages   web/src/engine/extract.ts
+  → 2. fixed rules turn cues into a tier (deck level 1–4)            web/src/engine/rules.ts
+  → 3. session floor: the tier never goes down                       web/src/components/Chat.tsx
+  → 4. LLM writes the reply, acting on that tier                     web/src/lib/llm.ts
+```
+
+The cue definitions and rules are in `skill/references/risk-cues.md`, so the white-label skill follows the same rules. In test mode, the **Engine** button in the web app shows the cues, rules and tier for every message.
+
+| Tier (requirements doc) | Deck level (focus-group slides) | Example |
+|---|---|---|
+| 0 Everyday stress | 1 Routine | "barely slept this week", figurative "want to shoot myself" |
+| 1 Persistent strain | 2 Watch | weeks of low mood, not eating |
+| 2 Ideation / self-harm | 2 Watch | "wish I could not wake up", self-harm to cope |
+| 2 Ideation / self-harm | 3 Escalate | "thinking about how I'd do it" |
+| 3 Imminent | 4 Urgent | intent, plan, recent attempt, can't stay safe |
+
+**Proof of concept:** `poc/` runs the same engine over 25 labelled vignettes several times each and reports misses, over-escalations and consistency. See `poc/README.md`.
 
 ## What the web MVP enforces in code
 

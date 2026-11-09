@@ -76,3 +76,5 @@ label.row input { width: auto; }
 .muted { color: var(--muted); }
 .small { font-size: 0.875rem; }
 .error { color: var(--danger); }
+.engine-log { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 10px; }
+.engine-msg { font-style: italic; color: var(--muted); }

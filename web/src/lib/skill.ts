@@ -1,6 +1,10 @@
 import skillMd from "../../../skill/SKILL.md?raw";
 import scriptsMd from "../../../skill/references/scripts.md?raw";
 import tier3Md from "../../../skill/references/tier3.md?raw";
+import riskCuesMd from "../../../skill/references/risk-cues.md?raw";
+
+/** The engine's extraction prompt (also the white-label skill's triage reference). */
+export const RISK_CUES_PROMPT = riskCuesMd;
 import thresholdsMd from "../../../skill/references/thresholds.md?raw";
 import { ROUTING_FILES } from "./routing";
 import { TEST_MODE } from "./config";
@@ -22,8 +26,9 @@ You are running inside a web app that implements parts of this skill in code. Di
 
 - The app already showed the opening disclosure (below). Do not repeat it.
 - The app renders contact cards, consent buttons, the summary preview, the TEST MODE label and the hotline card. In \`reply\`, refer to services by name; do not write out phone numbers, emails or the numbered consent list yourself.
+- **The app's engine sets the tier, not you.** Each turn a separate step extracts screener cues (references/risk-cues.md) and fixed rules turn them into a tier. The tier, the reasons and whether a clarifying question is needed are given in the session state. Act on that tier as described in section 3 of the skill; do not second-guess it in either direction. If the engine was unavailable this turn, the session state says so: then judge the tier yourself, never lower than the floor.
 - The app enforces: tier never decreasing, contacts only from the routing table, the hotline shown once, and the TEST MODE label. Still follow those rules yourself.
-- Session state (tier floor, hotline status, handoffs, mood and usage signals) is given in a separate system block each turn. Treat it as fact.
+- Session state (engine decision, hotline status, handoffs, mood and usage signals) is given in a separate system block each turn. Treat it as fact.
 
 Opening disclosure the student saw:
 > ${OPENING_DISCLOSURE}
@@ -31,7 +36,6 @@ Opening disclosure the student saw:
 ## Output fields
 
 - \`reply\`: what the student reads. Short and plain, per section 7 of the skill. One question at most.
-- \`tier\`: your current internal tier 0-3 (never mention it in \`reply\`).
 - \`institution\` / \`faculty\`: what the student has told you, or null.
 - \`situation\`: the routing override that applies, or "general".
 - \`route_ids\`: ids from the routing table to show as cards this turn: the top route plus at most one alternative. Empty if no referral this turn. Never repeat sg-sos / sg-mindline after the hotline was shown.
@@ -50,6 +54,7 @@ function routingBlock(): string {
 export const SKILL_PROMPT = [
   skillMd.replace("TEST_MODE: ON", `TEST_MODE: ${TEST_MODE ? "ON" : "OFF"}`),
   "# references/scripts.md\n\n" + scriptsMd,
+  "# references/risk-cues.md\n\n" + riskCuesMd,
   "# references/tier3.md\n\n" + tier3Md,
   "# references/thresholds.md\n\n" + thresholdsMd,
   "# Routing tables\n\n" + routingBlock(),

@@ -1,11 +1,11 @@
-import Anthropic from "@anthropic-ai/sdk";
+import type Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { SKILL_PROMPT } from "./skill";
 
+/** Step 3 of the engine: the reply. The tier is NOT in here: the rules decide it (engine/rules.ts). */
 export const TurnSchema = z.object({
   reply: z.string(),
-  tier: z.number().int().describe("Internal tier, 0 to 3"),
   institution: z.string().nullable(),
   faculty: z.string().nullable(),
   situation: z.enum(["general", "lgbtq", "sexual_misconduct", "cost", "emergency"]),
@@ -33,19 +33,16 @@ export interface ChatMessage {
 export class RefusalError extends Error {}
 
 /**
- * One chat turn. Runs in the browser with the student's own API key (GitHub
- * Pages has no server). `sessionState` changes every turn, so it sits after the
- * cached skill prompt to keep the cache valid.
+ * One reply. `sessionState` (including the engine's decision) changes every
+ * turn, so it sits after the cached skill prompt to keep the cache valid.
  */
 export async function runTurn(opts: {
-  apiKey: string;
+  client: Anthropic;
   model: string;
   history: ChatMessage[];
   sessionState: string;
 }): Promise<Turn> {
-  const client = new Anthropic({ apiKey: opts.apiKey, dangerouslyAllowBrowser: true });
-
-  const response = await client.beta.messages.parse({
+  const response = await opts.client.beta.messages.parse({
     model: opts.model,
     max_tokens: 16000,
     // Server-side fallback if a safety classifier declines a turn.

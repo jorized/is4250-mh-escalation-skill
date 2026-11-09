@@ -1,17 +1,21 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Anthropic from "@anthropic-ai/sdk";
 import { assistantText, RefusalError, runTurn, type ChatMessage, type Turn } from "../lib/llm";
 import { EMERGENCY_IDS, HOTLINE_IDS, resolveRoutes, type RouteEntry } from "../lib/routing";
-import { OPENING_DISCLOSURE } from "../lib/skill";
+import { OPENING_DISCLOSURE, RISK_CUES_PROMPT } from "../lib/skill";
 import { TEST_MODE } from "../lib/config";
 import { checkinDue, dependencySignals, moodOfferDue } from "../lib/signals";
 import * as store from "../lib/storage";
+import { extractCues, makeClient, type Line } from "../engine/extract.ts";
+import { decide, DECK_LABELS, type Decision, type Tier } from "../engine/rules.ts";
+import type { Cues } from "../engine/cues.ts";
 import { ContactCard, HandoffCard, SummaryPreview, summaryLines } from "./Cards";
 import { DataPanel } from "./DataPanel";
+import { EnginePanel, type EngineEntry } from "./EnginePanel";
 import type { Credentials } from "./Gate";
 
 type Item =
-  | { kind: "assistant"; text: string; routes: RouteEntry[]; consent?: { route: RouteEntry; turn: Turn }; answered?: boolean }
+  | { kind: "assistant"; text: string; routes: RouteEntry[]; consent?: { route: RouteEntry; turn: Turn; tier: Tier }; answered?: boolean }
   | { kind: "hotline"; routes: RouteEntry[] }
   | { kind: "user"; text: string }
   | { kind: "preview"; route: RouteEntry; lines: string[]; done?: boolean }
@@ -19,18 +23,21 @@ type Item =
   | { kind: "error"; text: string };
 
 export function Chat({ creds, onSignOut }: { creds: Credentials; onSignOut: () => void }) {
+  const client = useMemo(() => makeClient(creds.apiKey, true), [creds.apiKey]);
   const [items, setItems] = useState<Item[]>([]);
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [panel, setPanel] = useState(false);
+  const [busy, setBusy] = useState<"" | "engine" | "reply">("");
+  const [panel, setPanel] = useState<"" | "data" | "engine">("");
+  const [engineLog, setEngineLog] = useState<EngineEntry[]>([]);
 
   // Code-enforced safety state (not left to the model).
-  const tierFloor = useRef(0);
+  const tierFloor = useRef<Tier>(0);
   const hotlineShown = useRef(false);
   const handoffs = useRef<string[]>([]);
   const declined = useRef<string[]>([]);
   const sessionMessages = useRef(0);
+  const transcript = useRef<Line[]>([]); // plain text, for the cue extractor
 
   const [moodOptIn, setMoodOptIn] = useState(store.moodOptedIn());
   const [mood, setMood] = useState(store.loadMood());
@@ -51,12 +58,20 @@ export function Chat({ creds, onSignOut }: { creds: Credentials; onSignOut: () =
     setUsage(u);
   }, []);
 
-  function sessionState(): string {
+  function sessionState(tier: Tier, decision: Decision | null): string {
     const signals = dependencySignals(usage, sessionMessages.current);
     const now = new Date();
+    const engine = decision
+      ? [
+          `- Engine decision this turn: TIER ${tier} (deck level ${decision.level} ${DECK_LABELS[decision.level]}).`,
+          `- Reasons: ${decision.reasons.join("; ") || "no risk cues"}${tier > decision.tier ? ` (raised to ${tier} by the session floor or mood pattern)` : ""}.`,
+          `- Clarifying question needed: ${decision.followUp ? "YES, ask one, in plain words" : "no"}.`,
+          decision.nonEvent ? "- Figurative risk language only: do not escalate, do not ask a risk question." : "",
+        ]
+      : [`- Engine unavailable this turn. Judge the tier yourself; it must be at least ${tier}.`];
     return [
       "# Session state (from the app, this turn)",
-      `- Tier floor: ${tierFloor.current}. Your tier must not be lower than this.`,
+      ...engine.filter(Boolean),
       `- Hotline card (SOS 1767, mindline 1771): ${hotlineShown.current ? "ALREADY SHOWN. Refer back to it; do not list it again." : "not shown yet."}`,
       `- Summaries the student approved: ${handoffs.current.join(", ") || "none"}${TEST_MODE ? " (TEST MODE: nothing was actually sent)" : ""}.`,
       `- Student chose "Not now" for: ${declined.current.join(", ") || "none"}.`,
@@ -77,20 +92,36 @@ export function Chat({ creds, onSignOut }: { creds: Credentials; onSignOut: () =
     setUsage(u);
 
     const nextHistory: ChatMessage[] = [...history, { role: "user", content: trimmed }];
+    const nextLines: Line[] = [...transcript.current, { role: "student", text: trimmed }];
     setHistory(nextHistory);
     setItems((xs) => [...xs.map((x) => (x.kind === "assistant" ? { ...x, answered: true } : x)), { kind: "user", text: trimmed }]);
-    setBusy(true);
 
     try {
-      const turn = await runTurn({ apiKey: creds.apiKey, model: creds.model, history: nextHistory, sessionState: sessionState() });
+      // 1-2. Extract screener cues from the last ~20 messages, then apply the fixed rules.
+      setBusy("engine");
+      let cues: Cues | null = null;
+      let decision: Decision | null = null;
+      try {
+        cues = await extractCues({ client, model: creds.model, cuesPrompt: RISK_CUES_PROMPT, lines: nextLines });
+        decision = decide(cues);
+      } catch (err) {
+        if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.RateLimitError) throw err;
+        console.warn("Engine unavailable this turn; falling back to the model's judgment.", err);
+      }
 
-      // M6: the tier never goes down within a session.
-      turn.tier = Math.max(Math.min(Math.max(turn.tier, 0), 3), tierFloor.current);
-      tierFloor.current = turn.tier;
+      // M6 floor + M7 mood pattern. The tier never goes down within a session.
+      let tier = Math.max(tierFloor.current, decision?.tier ?? 0) as Tier;
+      if (tier === 0 && moodOptIn && moodOfferDue(mood)) tier = 1;
+      tierFloor.current = tier;
+      setEngineLog((log) => [...log, { message: trimmed, cues, decision, tier }]);
+
+      // 3. Reply, acting on that tier.
+      setBusy("reply");
+      const turn = await runTurn({ client, model: creds.model, history: nextHistory, sessionState: sessionState(tier, decision) });
 
       // M1: only routing-table entries; hotline only once (M9).
       let routes = resolveRoutes(turn.route_ids).filter((r) => !hotlineShown.current || !HOTLINE_IDS.includes(r.id));
-      if (turn.tier === 3 && !routes.some((r) => EMERGENCY_IDS.includes(r.id))) routes = [...resolveRoutes(EMERGENCY_IDS), ...routes];
+      if (tier === 3 && !routes.some((r) => EMERGENCY_IDS.includes(r.id))) routes = [...resolveRoutes(EMERGENCY_IDS), ...routes];
       routes = routes.slice(0, 3);
 
       const newItems: Item[] = [];
@@ -100,20 +131,22 @@ export function Chat({ creds, onSignOut }: { creds: Credentials; onSignOut: () =
         text: turn.reply,
         // The route being offered is the top route: show its card first, not hidden behind "Yes".
         routes: consentRoute ? [consentRoute, ...routes.filter((r) => r.id !== consentRoute.id)] : routes,
-        consent: consentRoute && turn.summary ? { route: consentRoute, turn } : undefined,
+        consent: consentRoute && turn.summary ? { route: consentRoute, turn, tier } : undefined,
       });
-      if ((turn.show_hotline || turn.tier >= 2) && !hotlineShown.current) {
+      // Fail safe: if the engine couldn't run, show the hotline rather than risk missing a crisis.
+      if ((turn.show_hotline || tier >= 2 || !decision) && !hotlineShown.current) {
         hotlineShown.current = true;
         newItems.push({ kind: "hotline", routes: resolveRoutes(HOTLINE_IDS) });
       }
 
       setItems((xs) => [...xs, ...newItems]);
       setHistory([...nextHistory, { role: "assistant", content: assistantText(turn) }]);
+      transcript.current = [...nextLines, { role: "assistant", text: turn.reply }];
     } catch (err) {
       setHistory(history); // drop the failed user turn so history stays valid
       setItems((xs) => [...xs, { kind: "error", text: errorText(err) }]);
     } finally {
-      setBusy(false);
+      setBusy("");
     }
   }
 
@@ -121,7 +154,7 @@ export function Chat({ creds, onSignOut }: { creds: Credentials; onSignOut: () =
     const c = item.consent!;
     setItems((xs) => xs.map((x) => (x === item ? { ...x, answered: true } : x)));
     if (choice === "yes") {
-      const basis = c.turn.tier === 3 ? "student agreed (Tier 3)" : "student agreed";
+      const basis = c.tier === 3 ? "student agreed (Tier 3)" : "student agreed";
       setItems((xs) => [...xs, { kind: "preview", route: c.route, lines: summaryLines(c.turn.summary!, basis) }]);
     } else if (choice === "no") {
       declined.current.push(c.route.unit);
@@ -149,6 +182,7 @@ export function Chat({ creds, onSignOut }: { creds: Credentials; onSignOut: () =
   }
 
   const showCheckin = moodOptIn && checkinDue(mood);
+  const togglePanel = (p: "data" | "engine") => setPanel((cur) => (cur === p ? "" : p));
 
   return (
     <div className="app">
@@ -157,12 +191,21 @@ export function Chat({ creds, onSignOut }: { creds: Credentials; onSignOut: () =
           <strong>Student Support Chat</strong>
           {TEST_MODE && <span className="tag test">TEST MODE</span>}
         </div>
-        <button className="secondary" onClick={() => setPanel((p) => !p)}>
-          Your data
-        </button>
+        <div className="actions">
+          {TEST_MODE && (
+            <button className="secondary" onClick={() => togglePanel("engine")}>
+              Engine
+            </button>
+          )}
+          <button className="secondary" onClick={() => togglePanel("data")}>
+            Your data
+          </button>
+        </div>
       </header>
 
-      {panel && (
+      {panel === "engine" && TEST_MODE && <EnginePanel entries={engineLog} onClose={() => setPanel("")} />}
+
+      {panel === "data" && (
         <DataPanel
           moodOptIn={moodOptIn}
           mood={mood}
@@ -181,7 +224,7 @@ export function Chat({ creds, onSignOut }: { creds: Credentials; onSignOut: () =
             store.forgetApiKey();
             onSignOut();
           }}
-          onClose={() => setPanel(false)}
+          onClose={() => setPanel("")}
         />
       )}
 
@@ -264,7 +307,7 @@ export function Chat({ creds, onSignOut }: { creds: Credentials; onSignOut: () =
             }
           }}
         />
-        <button type="submit" disabled={busy || !input.trim()}>
+        <button type="submit" disabled={Boolean(busy) || !input.trim()}>
           Send
         </button>
       </form>

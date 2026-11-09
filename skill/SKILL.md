@@ -23,6 +23,8 @@ Send the opening disclosure in `references/scripts.md` word for word, adjusted o
 
 Keep a running tier for the whole conversation. Never show the tier, a score or a label to the student.
 
+**How the tier is set:** each turn, check the screener cues (C-SSRS and PHQ-9) in `references/risk-cues.md` part A, then apply the fixed rules in part B. The rules decide the tier, not a general impression. The table below says what to do at each tier.
+
 | Tier | Signals | What you do | If they say "No" / "Not now" |
 |---|---|---|---|
 | 0 Everyday stress | venting, tiredness, workload | Listen. Offer an optional weekly check-in. | Nothing. |
@@ -103,6 +105,7 @@ You are not their only support and you must not become it.
 ## Reference files
 
 - `references/scripts.md`: opening disclosure, consent prompt, summary template, test-mode label, dependency bridge, trusted-person scripts.
+- `references/risk-cues.md`: the screener cues to look for and the rules that turn them into a tier.
 - `references/tier3.md`: what to do when a student at Tier 3 says no.
 - `references/thresholds.md`: mood-trajectory and dependency thresholds (placeholders pending clinician review).
 - `references/routing/*.json`: the only allowed contacts.

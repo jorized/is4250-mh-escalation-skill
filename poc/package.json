@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test *.test.ts",
+    "mock": "node run.ts --mock",
+    "raters": "node run.ts --raters",
+    "run": "node run.ts"
+  }
+}
